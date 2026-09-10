@@ -1,0 +1,81 @@
+Id,Name,Shape Library,Page ID,Contained By,Line Style,Shape Type,Text Area 1,Description,Status
+1,"Client / WebSocket: AGENT_QUERY",standard,1,,solid,Terminator,"Client / WebSocket: AGENT_QUERY
+• ws/analyze/ on_receive
+• Action: DATA_ANALYSIS:AGENT_QUERY
+• Payload: { user_query, session_id }","Entry point: Client / WebSocket: AGENT_QUERY",INGRESS
+2,"1. ActionDispatcher & Handler",standard,1,,solid,Process,"1. ActionDispatcher & Handler
+• Validates action against allowed commands
+• Locates AgentOrchestrationCommand
+• Injects RequestContextProxy","Action routing & pre-dispatch execution",PROCESS
+3,"2. AgentOrchestrationCommand",standard,1,,solid,Process,"2. AgentOrchestrationCommand
+• Validates input prompt or user_query
+• Hydrates DatasetSchemaContext (columns & types)
+• Builds typed AgentQueryContext DTO","Validates input, builds QueryContext",PROCESS
+4,"Context Providers",standard,1,,solid,Process,"Context Providers
+• • DatasetSchemaProvider (Table column types & metadata)
+• • OperationCatalogProvider (Available NastFlow operations)","Hydrates table schema & operation catalog",PROCESS
+5,"Cycle 1: Intent Classification",standard,1,,solid,Process,"Cycle 1: Intent Classification
+• Orchestrator invokes IntentClassifierSubAgent
+• Gemini Flash (HTTP 200 in ~12s)
+• Receives AgentResponse(Intent, 0.95)","Orchestrator delegates intent classification",AI TURN
+6,"Orchestrator Intent Routing Decision",standard,1,,solid,Decision,"Orchestrator Intent Routing Decision
+• Orchestrator inspects classified intent
+• Branch A: conversational / explain_data
+• Branch B: plan_pipeline","Orchestrator evaluates intent to determine next subagent",PROCESS
+7,"Cycle 2a: Explainer",standard,1,,solid,Process,"Cycle 2a: Explainer
+• Orchestrator invokes ExplainerSubAgent (~49s)
+• Produces narrative insights & suggested followups
+• Returns AgentResponse(Chat) to Orchestrator","Orchestrator delegates conversational explanation",AI TURN
+8,"Cycle 2b: Planner",standard,1,,solid,Process,"Cycle 2b: Planner
+• FeasibilityChecker pre-flight validation
+• PipelinePlanner synthesizes raw pipeline steps
+• Returns AgentResponse(Plan) to Orchestrator","Orchestrator delegates pipeline step generation",AI TURN
+9,"Cycle 2c: Parallel Check",standard,1,,solid,Process,"Cycle 2c: Parallel Check
+• Orchestrator coordinates ParallelSubAgentCoordinator
+• ├─ SchemaValidatorSubAgent: validates step parameters
+• └─ ExplainerSubAgent: generates summary
+• Returns verified steps & errors to Orchestrator","Orchestrator coordinates parallel validation",AI TURN
+10,"Self-Aware Loop & Convergence Guard",standard,1,,solid,Decision,"Self-Aware Loop & Convergence Guard
+• • Convergence: Check Schema & Feasibility errors
+• • Budget: cycle_count < max_cycles (default 2)
+• • Anti-Stagnation: plan_hash != previous_hash
+• • Action: PASS (Clean) | REFINE (Fixable) | DIVERT (Stuck)","Supervisory iteration budget, stagnation & convergence check",PROCESS
+11,"ClarifierSubAgent (Divert / Fallback)",standard,1,,solid,Process,"ClarifierSubAgent (Divert / Fallback)
+• Invoked on cycle exhaustion or repeated validation failure
+• Transforms raw schema errors into user-friendly clarification
+• Returns AgentResponse(Clarification) with suggested options","Self-healing fallback when stuck or ambiguous",AI TURN
+12,"Cycle 3: State Aggregation",standard,1,,solid,Process,"Cycle 3: State Aggregation
+• Orchestrator compiles turn results into AgentExecutionResult
+• Validates feasibility & collects follow-up suggestions
+• Returns AgentExecutionResult to AgentOrchestrationCommand","Compiles turn results into AgentExecutionResult",AI TURN
+13,"4. AgentOrchestrationCommand",standard,1,,solid,Process,"4. AgentOrchestrationCommand
+• Receives AgentExecutionResult from Orchestrator
+• Enriches Result Monad with: payload_type=""agent""
+• Returns SuccessResult(payload=AgentPayload)","Enriches Result Monad with: payload_type=""agent""",SUCCESS
+14,"5. ActionDispatcher: Line 322",standard,1,,solid,Process,"5. ActionDispatcher: Line 322
+• Line 322: InternalSuccessResponse(payload=result.payload)
+• Pydantic V2 discriminated union VALIDATED cleanly
+• Zero union_tag_not_found errors","InternalSuccessResponse Validated",SUCCESS
+15,"6. WebSocket Response Delivery",standard,1,,solid,Terminator,"6. WebSocket Response Delivery
+• SectionBuilder compiles Display Sections
+• Consumer transmits verified JSON over WebSocket
+• UI receives structured response & pipeline steps","Final response delivery to user UI",SUCCESS
+
+Line Style,Source,Target,Text Area 1,Arrowhead
+solid,1,2,,Arrow
+solid,2,3,,Arrow
+solid,3,4,"QueryContext",Arrow
+solid,4,5,"Context Hydrated",Arrow
+solid,5,6,"AgentResponse(Intent)",Arrow
+solid,6,7,"conversational",Arrow
+solid,6,8,"plan_pipeline",Arrow
+solid,8,9,"AgentResponse(Plan)",Arrow
+solid,9,10,"Validation Report",Arrow
+solid,10,8,"Refine Loop (Cycle < Max)",Arrow
+solid,10,11,"Infeasible / Stagnant",Arrow
+solid,11,12,"AgentResponse(Clarify)",Arrow
+solid,10,12,"Converged / Pass",Arrow
+solid,7,12,"AgentResponse(Chat)",Arrow
+solid,12,13,"AgentExecutionResult",Arrow
+solid,13,14,"SuccessResult(AgentPayload)",Arrow
+solid,14,15,"InternalSuccessResponse",Arrow

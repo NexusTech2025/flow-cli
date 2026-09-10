@@ -1,0 +1,373 @@
+{
+  "id": "diagram_imported",
+  "title": "websocket_crash_flow",
+  "direction": "TD",
+  "metadata": {
+    "created_at": "2026-09-10T07:38:51.344Z",
+    "updated_at": "2026-09-10T10:02:33.652Z",
+    "theme": "light"
+  },
+  "nodes": [
+    {
+      "id": "node_ingress",
+      "label": "Client / WebSocket: AGENT_QUERY",
+      "description": "Entry point: Client / WebSocket: AGENT_QUERY",
+      "details": [
+        "ws/analyze/ on_receive",
+        "Action: DATA_ANALYSIS:AGENT_QUERY",
+        "Payload: { user_query, session_id }"
+      ],
+      "status": "ingress",
+      "shapeType": "Terminator",
+      "customData": {}
+    },
+    {
+      "id": "node_dispatcher",
+      "label": "1. ActionDispatcher & Handler",
+      "description": "Action routing & pre-dispatch execution",
+      "details": [
+        "Validates action against allowed commands",
+        "Locates AgentOrchestrationCommand",
+        "Injects RequestContextProxy"
+      ],
+      "status": "normal",
+      "shapeType": "Process",
+      "customData": {}
+    },
+    {
+      "id": "node_cmd_entry",
+      "label": "2. AgentOrchestrationCommand",
+      "description": "Validates input, builds QueryContext",
+      "details": [
+        "Validates input prompt or user_query",
+        "Hydrates DatasetSchemaContext (columns & types)",
+        "Builds typed AgentQueryContext DTO"
+      ],
+      "status": "normal",
+      "shapeType": "Process",
+      "customData": {}
+    },
+    {
+      "id": "node_context_providers",
+      "label": "Context Providers",
+      "description": "Hydrates table schema & operation catalog",
+      "details": [
+        "• DatasetSchemaProvider (Table column types & metadata)",
+        "• OperationCatalogProvider (Available NastFlow operations)"
+      ],
+      "status": "normal",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cycle_1",
+      "label": "Cycle 1: Intent Classification",
+      "description": "Orchestrator delegates intent classification",
+      "details": [
+        "Orchestrator invokes IntentClassifierSubAgent",
+        "Gemini Flash (HTTP 200 in ~12s)",
+        "Receives AgentResponse(Intent, 0.95)"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_intent_decision",
+      "label": "Orchestrator Intent Routing Decision",
+      "description": "Orchestrator evaluates intent to determine next subagent",
+      "details": [
+        "Orchestrator inspects classified intent",
+        "Branch A: conversational / explain_data",
+        "Branch B: plan_pipeline"
+      ],
+      "status": "normal",
+      "shapeType": "Decision",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cycle_2a",
+      "label": "Cycle 2a: Explainer",
+      "description": "Orchestrator delegates conversational explanation",
+      "details": [
+        "Orchestrator invokes ExplainerSubAgent (~49s)",
+        "Produces narrative insights & suggested followups",
+        "Returns AgentResponse(Chat) to Orchestrator"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cycle_2b",
+      "label": "Cycle 2b: Planner",
+      "description": "Orchestrator delegates pipeline step generation",
+      "details": [
+        "FeasibilityChecker pre-flight validation",
+        "PipelinePlanner synthesizes raw pipeline steps",
+        "Returns AgentResponse(Plan) to Orchestrator"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cycle_2c",
+      "label": "Cycle 2c: Parallel Check",
+      "description": "Orchestrator coordinates parallel validation",
+      "details": [
+        "Orchestrator coordinates ParallelSubAgentCoordinator",
+        "├─ SchemaValidatorSubAgent: validates step parameters",
+        "└─ ExplainerSubAgent: generates summary",
+        "Returns verified steps & errors to Orchestrator"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_loop_guard",
+      "label": "Self-Aware Loop & Convergence Guard",
+      "description": "Supervisory iteration budget, stagnation & convergence check",
+      "details": [
+        "• Convergence: Check Schema & Feasibility errors",
+        "• Budget: cycle_count < max_cycles (default 2)",
+        "• Anti-Stagnation: plan_hash != previous_hash",
+        "• Action: PASS (Clean) | REFINE (Fixable) | DIVERT (Stuck)"
+      ],
+      "status": "normal",
+      "shapeType": "Decision",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_clarifier",
+      "label": "ClarifierSubAgent (Divert / Fallback)",
+      "description": "Self-healing fallback when stuck or ambiguous",
+      "details": [
+        "Invoked on cycle exhaustion or repeated validation failure",
+        "Transforms raw schema errors into user-friendly clarification",
+        "Returns AgentResponse(Clarification) with suggested options"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cycle_3_agg",
+      "label": "Cycle 3: State Aggregation",
+      "description": "Compiles turn results into AgentExecutionResult",
+      "details": [
+        "Orchestrator compiles turn results into AgentExecutionResult",
+        "Validates feasibility & collects follow-up suggestions",
+        "Returns AgentExecutionResult to AgentOrchestrationCommand"
+      ],
+      "status": "ai",
+      "shapeType": "Process",
+      "customData": {
+        "container": "OrchSupervisor",
+        "containerTitle": "3. AgentOrchestrator (Central Supervisor)"
+      }
+    },
+    {
+      "id": "node_cmd_synth",
+      "label": "4. AgentOrchestrationCommand",
+      "description": "Enriches Result Monad with: payload_type=\"agent\"",
+      "details": [
+        "Receives AgentExecutionResult from Orchestrator",
+        "Enriches Result Monad with: payload_type=\"agent\"",
+        "Returns SuccessResult(payload=AgentPayload)"
+      ],
+      "status": "success",
+      "shapeType": "Process",
+      "customData": {}
+    },
+    {
+      "id": "node_dispatcher_resp",
+      "label": "5. ActionDispatcher: Line 322",
+      "description": "InternalSuccessResponse Validated",
+      "details": [
+        "Line 322: InternalSuccessResponse(payload=result.payload)",
+        "Pydantic V2 discriminated union VALIDATED cleanly",
+        "Zero union_tag_not_found errors"
+      ],
+      "status": "success",
+      "shapeType": "Process",
+      "customData": {}
+    },
+    {
+      "id": "node_egress",
+      "label": "6. WebSocket Response Delivery",
+      "description": "Final response delivery to user UI",
+      "details": [
+        "SectionBuilder compiles Display Sections",
+        "Consumer transmits verified JSON over WebSocket",
+        "UI receives structured response & pipeline steps"
+      ],
+      "status": "success",
+      "shapeType": "Terminator",
+      "customData": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "node_ingress->node_dispatcher",
+      "source": "node_ingress",
+      "target": "node_dispatcher",
+      "label": "",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_dispatcher->node_cmd_entry",
+      "source": "node_dispatcher",
+      "target": "node_cmd_entry",
+      "label": "",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cmd_entry->node_context_providers",
+      "source": "node_cmd_entry",
+      "target": "node_context_providers",
+      "label": "QueryContext",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_context_providers->node_cycle_1",
+      "source": "node_context_providers",
+      "target": "node_cycle_1",
+      "label": "Context Hydrated",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cycle_1->node_intent_decision",
+      "source": "node_cycle_1",
+      "target": "node_intent_decision",
+      "label": "AgentResponse(Intent)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_intent_decision->node_cycle_2a",
+      "source": "node_intent_decision",
+      "target": "node_cycle_2a",
+      "label": "conversational",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_intent_decision->node_cycle_2b",
+      "source": "node_intent_decision",
+      "target": "node_cycle_2b",
+      "label": "plan_pipeline",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cycle_2b->node_cycle_2c",
+      "source": "node_cycle_2b",
+      "target": "node_cycle_2c",
+      "label": "AgentResponse(Plan)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cycle_2c->node_loop_guard",
+      "source": "node_cycle_2c",
+      "target": "node_loop_guard",
+      "label": "Validation Report",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_loop_guard->node_cycle_2b",
+      "source": "node_loop_guard",
+      "target": "node_cycle_2b",
+      "label": "Refine Loop (Cycle < Max)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_loop_guard->node_clarifier",
+      "source": "node_loop_guard",
+      "target": "node_clarifier",
+      "label": "Infeasible / Stagnant",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_clarifier->node_cycle_3_agg",
+      "source": "node_clarifier",
+      "target": "node_cycle_3_agg",
+      "label": "AgentResponse(Clarify)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_loop_guard->node_cycle_3_agg",
+      "source": "node_loop_guard",
+      "target": "node_cycle_3_agg",
+      "label": "Converged / Pass",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cycle_2a->node_cycle_3_agg",
+      "source": "node_cycle_2a",
+      "target": "node_cycle_3_agg",
+      "label": "AgentResponse(Chat)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cycle_3_agg->node_cmd_synth",
+      "source": "node_cycle_3_agg",
+      "target": "node_cmd_synth",
+      "label": "AgentExecutionResult",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_cmd_synth->node_dispatcher_resp",
+      "source": "node_cmd_synth",
+      "target": "node_dispatcher_resp",
+      "label": "SuccessResult(AgentPayload)",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    },
+    {
+      "id": "node_dispatcher_resp->node_egress",
+      "source": "node_dispatcher_resp",
+      "target": "node_egress",
+      "label": "InternalSuccessResponse",
+      "lineStyle": "solid",
+      "arrowhead": "Arrow"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "flow-cli",
+  "version": "1.0.0",
+  "description": "Headless diagramming CLI & AST compiler for AI agents to create, mutate, and export Lucidchart CSV, Mermaid, and SVG flows with topological auto-healing.",
+  "type": "module",
+  "main": "src/cli.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "parse": "node src/cli.js parse",
+    "export": "node src/cli.js export",
+    "mutate": "node src/cli.js mutate",
+    "test": "node src/cli.js test"
+  },
+  "keywords": [
+    "lucidchart",
+    "flowchart",
+    "mermaid",
+    "diagrams",
+    "light-theme"
+  ],
+  "author": "AnalyticaX Team",
+  "license": "MIT"
+}

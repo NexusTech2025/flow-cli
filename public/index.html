@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LucidFlow Architect - Flowchart Visualizer & Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-title">LucidFlow Architect</div>
+      <span class="brand-badge">Lucidchart Light</span>
+    </div>
+    <div class="nav-actions">
+      <button id="btn-import-text" class="btn">
+        <span>📄</span> Import Text
+      </button>
+      <button id="btn-add-node" class="btn">
+        <span>➕</span> Add Node
+      </button>
+      <div style="width: 1px; height: 24px; background: #E2E8F0; margin: 0 4px;"></div>
+      <button id="btn-export-csv" class="btn btn-primary">
+        <span>📥</span> Lucidchart CSV
+      </button>
+      <button id="btn-view-mermaid" class="btn">
+        <span>👁️</span> View Mermaid
+      </button>
+      <button id="btn-export-mermaid" class="btn">
+        <span>🧬</span> Copy Mermaid
+      </button>
+      <button id="btn-export-json" class="btn">
+        <span>💾</span> Export JSON
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="app-layout">
+    <!-- SVG Canvas Wrapper -->
+    <div id="canvas-wrapper" class="canvas-wrapper">
+      <svg id="diagram-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748B" />
+          </marker>
+          <marker id="arrow-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#EF4444" />
+          </marker>
+        </defs>
+        <g id="viewport-group"></g>
+      </svg>
+
+      <!-- Canvas Controls -->
+      <div class="canvas-controls">
+        <button id="ctrl-zoom-in" class="control-btn" title="Zoom In">＋</button>
+        <button id="ctrl-zoom-out" class="control-btn" title="Zoom Out">－</button>
+        <button id="ctrl-zoom-reset" class="control-btn" title="Reset Zoom">⟲</button>
+        <button id="ctrl-zoom-fit" class="control-btn" title="Fit to Screen">⛶</button>
+      </div>
+    </div>
+
+    <!-- Right-Hand Inspector Panel -->
+    <aside id="inspector-panel" class="inspector-panel">
+      <div class="inspector-header">
+        <h3 class="inspector-title">Node Inspector</h3>
+        <span id="selected-badge" class="badge badge-normal">SELECT NODE</span>
+      </div>
+
+      <div class="inspector-body">
+        <div id="inspector-empty" style="text-align: center; color: var(--text-muted); margin-top: 40px;">
+          <p>Click on any node in the diagram to inspect, edit properties, or mutate connections.</p>
+        </div>
+
+        <form id="inspector-form" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="inp-node-id">Node ID</label>
+            <input type="text" id="inp-node-id" class="form-input" readonly style="background: #F1F5F9; color: var(--text-secondary);" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="inp-node-label">Label</label>
+            <input type="text" id="inp-node-label" class="form-input" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="inp-node-status">Status / Color Role</label>
+            <select id="inp-node-status" class="form-select">
+              <option value="normal">Normal Process (Slate)</option>
+              <option value="ingress">Ingress / Entry (Sky Blue)</option>
+              <option value="warning">Warning / Graceful (Amber)</option>
+              <option value="ai">AI / LLM Turn (Lavender)</option>
+              <option value="success">Success / Valid (Mint Green)</option>
+              <option value="crash">Crash / Fatal Error (Rose Red)</option>
+              <option value="fallback">Fallback / System Error (Deep Rose)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="inp-node-desc">Description</label>
+            <textarea id="inp-node-desc" class="form-textarea"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Key Details / Bullet Points</label>
+            <ul id="node-details-list" class="details-list"></ul>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button type="button" id="btn-save-node" class="btn btn-primary" style="flex: 1;">
+              Save Changes
+            </button>
+            <button type="button" id="btn-delete-node" class="btn btn-danger" title="Delete with Edge Healing">
+              Delete (Heal)
+            </button>
+          </div>
+        </form>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Import Modal -->
+  <div id="modal-import" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Import Text Flowchart</h3>
+        <button class="modal-close" id="btn-close-import">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary);">
+          Paste any text-based flowchart (ASCII boxes, Unicode arrows │/▼, numbered steps, bullet details, or crash indicators).
+        </p>
+        <textarea id="txt-import-content" class="form-textarea" style="height: 240px; font-family: monospace; font-size: 12px;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-import" class="btn">Cancel</button>
+        <button id="btn-submit-import" class="btn btn-primary">Parse & Visualize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Node Modal -->
+  <div id="modal-add" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Node</h3>
+        <button class="modal-close" id="btn-close-add">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="new-node-id">Node ID</label>
+          <input type="text" id="new-node-id" class="form-input" placeholder="e.g. node_step_4b" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-node-label">Label</label>
+          <input type="text" id="new-node-label" class="form-input" placeholder="e.g. 4b. Payload Type Validator" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-node-status">Status Role</label>
+          <select id="new-node-status" class="form-select">
+            <option value="normal">Normal Process (Slate)</option>
+            <option value="ingress">Ingress / Entry (Sky Blue)</option>
+            <option value="warning">Warning / Graceful (Amber)</option>
+            <option value="ai">AI / LLM Turn (Lavender)</option>
+            <option value="success" selected>Success / Valid (Mint Green)</option>
+            <option value="crash">Crash / Fatal Error (Rose Red)</option>
+            <option value="fallback">Fallback / System Error (Deep Rose)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-node-desc">Description</label>
+          <textarea id="new-node-desc" class="form-textarea" placeholder="Detailed purpose of this step"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-node-after">Insert After Existing Node (Optional)</label>
+          <select id="new-node-after" class="form-select">
+            <option value="">-- None (Standalone / Manual Wiring) --</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-add" class="btn">Cancel</button>
+        <button id="btn-submit-add" class="btn btn-primary">Insert Node</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Mermaid Modal -->
+  <div id="modal-mermaid" class="modal-overlay">
+    <div class="modal-card" style="max-width: 760px; width: 92%;">
+      <div class="modal-header">
+        <h3 class="modal-title">🧬 Mermaid Light-Theme Code</h3>
+        <button class="modal-close" id="btn-close-mermaid">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+          Synchronized live with <code>charts-app/output/diagram.mmd</code>. Copy directly into Lucidchart or Markdown viewers.
+        </p>
+        <pre id="mermaid-code-display" style="background: #0F172A; color: #38BDF8; padding: 16px; border-radius: 8px; font-size: 12px; font-family: Consolas, Monaco, monospace; max-height: 440px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; border: 1px solid #334155;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-copy-mermaid-modal" class="btn btn-primary"><span>📋</span> Copy Code</button>
+        <button id="btn-close-mermaid-footer" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

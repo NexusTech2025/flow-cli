@@ -1,0 +1,36 @@
+[Client / WebSocket: AGENT_QUERY]
+              │
+              ▼
+    1. Schema Context Provider
+       • Looked up 'dataframe_table_schema' in SimpleSchemaRegistry
+       • Not registered → logged error, caught gracefully (NO CRASH)
+              │
+              ▼
+    2. LLM Turn 1: Intent Classification
+       • POST https://.../gemini-3.6-flash:generateContent → HTTP 200 OK (12:37:09)
+       • Classified intent as 'conversational' (confidence: 0.95)
+              │
+              ▼
+    3. LLM Turn 2: SubAgent Reasoning / Explainer
+       • POST https://.../gemini-3.6-flash:generateContent → HTTP 200 OK (12:37:58)
+       • Generated narrative conversational response
+              │
+              ▼
+    4. GeneratePipelineStepCommandV2
+       • Returned SuccessResult(payload={
+             "pipeline_steps": [],
+             "intent": "conversational",
+             "message": "...",
+             ...
+         })
+              │
+              ▼
+    5. ActionDispatcher.dispatch()  💥 CRASH HERE
+       • Line 322: InternalSuccessResponse(payload=command_result.payload)
+       • Pydantic ValidationError: missing discriminator tag 'payload_type'
+              │
+              ▼
+    6. System Error Fallback
+       • Caught by broad dispatcher 'except Exception'
+       • Fallback to profiles.system.unhandled_error
+       • Emitted: UNHANDLED_SYSTEM_ERROR ("An unexpected system error occurred.")
